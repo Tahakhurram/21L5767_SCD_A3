@@ -6,6 +6,8 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 
 class Item {
@@ -38,14 +40,24 @@ class Book extends Item {
     private String author;
     private int pageCount;
     private int year;
+    private int popularityCount;
 
     public Book(String title, String author, int type, int pageCount, int year) {
         super(title, type);
         this.author = author;
         this.pageCount = pageCount;
         this.year = year;
+        this.popularityCount = 0;
     }
 
+    public int getPopularityCount() {
+        return popularityCount;
+    }
+
+    public void incrementPopularityCount() {
+        popularityCount++;
+    }
+    
     public String getAuthor() {
         return author;
     }
@@ -76,9 +88,11 @@ class Book extends Item {
 
 class Library {
     private List<Item> items;
+    private Map<String, Integer> popularityMap;
 
     public Library() {
         items = new ArrayList<>();
+        popularityMap = new HashMap<>();
     }
 
     public boolean addItem(Item item) {
@@ -101,6 +115,64 @@ class Library {
     public List<Item> getItems() {
         return items;
     }
+    
+    public int getBookPageCount(String title) {
+        for (Item item : items) {
+            if (item instanceof Book && item.getTitle().equals(title)) {
+                return ((Book) item).getPageCount();
+            }
+        }
+        return -1; 
+    }
+
+    public int getBookYear(String title) {
+        for (Item item : items) {
+            if (item instanceof Book && item.getTitle().equals(title)) {
+                return ((Book) item).getYear();
+            }
+        }
+        return -1; 
+    }
+
+    public void setBookPageCount(String title, int pageCount) {
+        for (Item item : items) {
+            if (item instanceof Book && item.getTitle().equals(title)) {
+                ((Book) item).setPageCount(pageCount);
+            }
+        }
+    }
+
+    public void setBookYear(String title, int year) {
+        for (Item item : items) {
+            if (item instanceof Book && item.getTitle().equals(title)) {
+                ((Book) item).setYear(year);
+            }
+        }
+    }
+    
+    
+    public void viewBook(String title) {
+        if (popularityMap.containsKey(title)) {
+            int currentCount = popularityMap.get(title);
+            popularityMap.put(title, currentCount + 1);
+        } else {
+            popularityMap.put(title, 1);
+        }
+
+        //incrmnt popularity count
+        for (Item item : items) {
+            if (item instanceof Book && item.getTitle().equals(title)) {
+                ((Book) item).incrementPopularityCount();
+                break;
+            }
+        }
+    }
+
+    public int getBookPopularityCount(String title) {
+        return popularityMap.getOrDefault(title, 0);
+    }
+    
+    
 }
 
 class FileHandler {
@@ -127,7 +199,14 @@ class FileHandler {
     public void saveItemsToFile(List<Item> items, String filename) {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename))) {
             for (Item item : items) {
-                String line = item.getId() + ", " + item.getTitle() + ", " + item.getType();
+                String line;
+                if (item instanceof Book) {
+                    Book book = (Book) item;
+                    line = book.getId() + ", " + book.getTitle() + ", " + book.getAuthor() + ", "
+                            + book.getPageCount() + ", " + book.getYear() + ", " + book.getType();
+                } else {
+                    line = item.getId() + ", " + item.getTitle() + ", " + item.getType();
+                }
                 writer.write(line);
                 writer.newLine();
             }
@@ -176,6 +255,10 @@ class LibraryManagementSystemGUI {
             }
         });
 
+    String[] columnNames = {"ID", "Title", "Author", "Page Count", "Year"};
+    tableModel.setColumnIdentifiers(columnNames);
+    
+    updateTable();
         
         editButton.addActionListener(new ActionListener() {
         @Override
@@ -203,10 +286,22 @@ class LibraryManagementSystemGUI {
         });
 
         viewPopularityButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                showPopularityChart();
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            int selectedRow = table.getSelectedRow();
+            if (selectedRow >= 0 && selectedRow < library.getAvailableItems().size()) {
+                Item selectedItem = library.getAvailableItems().get(selectedRow);
+                if (selectedItem instanceof Book) {
+                    Book selectedBook = (Book) selectedItem;
+                    library.viewBook(selectedBook.getTitle()); //incrmnt popularity count
+                    updateTable();
+                } else {
+                    JOptionPane.showMessageDialog(frame, "Cannot view non-book items.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                JOptionPane.showMessageDialog(frame, "Please select a book to view.", "Error", JOptionPane.ERROR_MESSAGE);
             }
+        }
         });
 
         frame.pack();
@@ -250,6 +345,7 @@ class LibraryManagementSystemGUI {
                     if (itemAdded) {
                         JOptionPane.showMessageDialog(frame, "Item added successfully!");
                         updateTable();
+                        saveItemsToFile(); 
                         addItemFrame.dispose();
                     } else {
                         JOptionPane.showMessageDialog(frame, "Failed to add item.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -300,9 +396,11 @@ class LibraryManagementSystemGUI {
 
                     JOptionPane.showMessageDialog(editFrame, "Item edited successfully!");
                     updateTable();
+                    saveItemsToFile();
                     editFrame.dispose();
                 }
             });
+            
 
             editFrame.add(titleLabel);
             editFrame.add(titleField);
@@ -350,6 +448,11 @@ class LibraryManagementSystemGUI {
                 tableModel.addRow(row);
             }
         }
+    }
+    
+    private void saveItemsToFile() {
+        FileHandler fileHandler = new FileHandler();
+        fileHandler.saveItemsToFile(library.getItems(), "items.txt");
     }
 
     public static void main(String[] args) {
