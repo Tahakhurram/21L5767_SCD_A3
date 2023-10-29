@@ -9,14 +9,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 class Item {
-    private int id;
-    private String title;
-    private int popularity;
+    private static int nextId = 1;
 
-    public Item(int id, String title, int popularity) {
-        this.id = id;
+    protected int id;
+    protected String title;
+    protected int type;
+
+    public Item(String title, int type) {
+        this.id = nextId++;
         this.title = title;
-        this.popularity = popularity;
+        this.type = type;
     }
 
     public int getId() {
@@ -27,19 +29,18 @@ class Item {
         return title;
     }
 
-    public int getPopularity() {
-        return popularity;
+    public int getType() {
+        return type;
     }
 }
-
 
 class Book extends Item {
     private String author;
     private int pageCount;
     private int year;
 
-    public Book(int id,String title, String author, int popularity, int pageCount, int year) {
-        super(id, title, popularity);
+    public Book(String title, String author, int type, int pageCount, int year) {
+        super(title, type);
         this.author = author;
         this.pageCount = pageCount;
         this.year = year;
@@ -55,6 +56,21 @@ class Book extends Item {
 
     public int getYear() {
         return year;
+    }
+    public void setTitle(String title) {
+    this.title = title;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+
+    public void setPageCount(int pageCount) {
+        this.pageCount = pageCount;
+    }
+
+    public void setYear(int year) {
+        this.year = year;
     }
 }
 
@@ -97,8 +113,8 @@ class FileHandler {
                 if (parts.length == 3) {
                     int id = Integer.parseInt(parts[0].trim());
                     String title = parts[1].trim();
-                    int popularity = Integer.parseInt(parts[2].trim());
-                    Item item = new Item(id, title, popularity);
+                    int type = Integer.parseInt(parts[2].trim());
+                    Item item = new Item(title, type);
                     items.add(item);
                 }
             }
@@ -111,7 +127,7 @@ class FileHandler {
     public void saveItemsToFile(List<Item> items, String filename) {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename))) {
             for (Item item : items) {
-                String line = item.getId() + ", " + item.getTitle() + ", " + item.getPopularity();
+                String line = item.getId() + ", " + item.getTitle() + ", " + item.getType();
                 writer.write(line);
                 writer.newLine();
             }
@@ -133,18 +149,15 @@ class LibraryManagementSystemGUI {
         List<Item> items = fileHandler.loadItemsFromFile("items.txt");
         library.getItems().addAll(items);
 
-        // Initialize GUI components
         frame = new JFrame("Library Management System");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLayout(new BorderLayout());
 
-        // Create table
         tableModel = new DefaultTableModel();
         table = new JTable(tableModel);
         JScrollPane scrollPane = new JScrollPane(table);
         frame.add(scrollPane, BorderLayout.CENTER);
 
-        // Create buttons
         JPanel buttonPanel = new JPanel();
         JButton addButton = new JButton("Add Item");
         JButton editButton = new JButton("Edit Item");
@@ -156,7 +169,6 @@ class LibraryManagementSystemGUI {
         buttonPanel.add(viewPopularityButton);
         frame.add(buttonPanel, BorderLayout.SOUTH);
 
-        // Add event handlers for buttons
         addButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -164,13 +176,24 @@ class LibraryManagementSystemGUI {
             }
         });
 
+        
         editButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                // Implement edit item functionality
-                // ...
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            int selectedRow = table.getSelectedRow();
+            if (selectedRow >= 0 && selectedRow < library.getAvailableItems().size()) {
+                Item selectedItem = library.getAvailableItems().get(selectedRow);
+                if (selectedItem instanceof Book) {
+                    Book selectedBook = (Book) selectedItem;
+                    showEditItemDialog(selectedBook);
+                } else {
+                    JOptionPane.showMessageDialog(frame, "Cannot edit non-book items.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                JOptionPane.showMessageDialog(frame, "Please select a book to edit.", "Error", JOptionPane.ERROR_MESSAGE);
             }
-        });
+        }
+    });
 
         deleteButton.addActionListener(new ActionListener() {
             @Override
@@ -209,23 +232,21 @@ class LibraryManagementSystemGUI {
         addItemFrame.setSize(300, 200);
         addItemFrame.setLayout(new GridLayout(4, 2));
 
-        JLabel idLabel = new JLabel("ID:");
-        JTextField idField = new JTextField();
         JLabel titleLabel = new JLabel("Title:");
         JTextField titleField = new JTextField();
         JLabel authorLabel = new JLabel("Author:");
         JTextField authorField = new JTextField();
 
         JButton addButton = new JButton("Add");
+        
         addButton.addActionListener(new ActionListener() {
             
                     @Override
             public void actionPerformed(ActionEvent e) {
-                int id = Integer.parseInt(idField.getText());
                 String title = titleField.getText();
                 String author = authorField.getText();
                 if (!title.isEmpty() && !author.isEmpty()) {
-                    boolean itemAdded = library.addItem(new Book(id, title, author, 0, 0, 0));
+                    boolean itemAdded = library.addItem(new Book(title, author, 0, 0, 0));
                     if (itemAdded) {
                         JOptionPane.showMessageDialog(frame, "Item added successfully!");
                         updateTable();
@@ -247,59 +268,77 @@ class LibraryManagementSystemGUI {
 
         addItemFrame.setVisible(true);
     }
+    
+    
+        private void showEditItemDialog(Book book) {
+            JFrame editFrame = new JFrame("Edit Item: " + book.getTitle());
+            editFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            editFrame.setLayout(new GridLayout(4, 2));
+
+            JLabel titleLabel = new JLabel("Title:");
+            JTextField titleField = new JTextField(book.getTitle());
+            JLabel authorLabel = new JLabel("Author:");
+            JTextField authorField = new JTextField(book.getAuthor());
+            JLabel pageCountLabel = new JLabel("Page Count:");
+            JTextField pageCountField = new JTextField(String.valueOf(book.getPageCount()));
+            JLabel yearLabel = new JLabel("Year:");
+            JTextField yearField = new JTextField(String.valueOf(book.getYear()));
+
+            JButton saveButton = new JButton("Save");
+            saveButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    String newTitle = titleField.getText();
+                    String newAuthor = authorField.getText();
+                    int newPageCount = Integer.parseInt(pageCountField.getText());
+                    int newYear = Integer.parseInt(yearField.getText());
+
+                    book.setTitle(newTitle);
+                    book.setAuthor(newAuthor);
+                    book.setPageCount(newPageCount);
+                    book.setYear(newYear);
+
+                    JOptionPane.showMessageDialog(editFrame, "Item edited successfully!");
+                    updateTable();
+                    editFrame.dispose();
+                }
+            });
+
+            editFrame.add(titleLabel);
+            editFrame.add(titleField);
+            editFrame.add(authorLabel);
+            editFrame.add(authorField);
+            editFrame.add(pageCountLabel);
+            editFrame.add(pageCountField);
+            editFrame.add(yearLabel);
+            editFrame.add(yearField);
+            editFrame.add(saveButton);
+
+            editFrame.pack();
+            editFrame.setVisible(true);
+        }
+
 
     private void showPopularityChart() {
-        // Implement a new screen to display the popularity chart (bar chart) using Graphics
         JFrame popularityFrame = new JFrame("Popularity Chart");
         popularityFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         popularityFrame.setLayout(new BorderLayout());
 
-        // JPanel to draw the chart
+        
         JPanel chartPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-               // Get the popularity data from the items list
-    
-               List<Item> items = library.getItems();
-        int[] popularityData = new int[items.size()];
-        for (int i = 0; i < items.size(); i++) {
-            popularityData[i] = items.get(i).getPopularity();
-        }
-
-        // Determine the maximum popularity value
-        int maxPopularity = 0;
-        for (int popularity : popularityData) {
-            if (popularity > maxPopularity) {
-                maxPopularity = popularity;
+                
             }
-        }
+        };
+        popularityFrame.add(chartPanel, BorderLayout.CENTER);
 
-        // Define the dimensions of the chart
-        int chartWidth = getWidth() - 40;
-        int chartHeight = getHeight() - 40;
-        int barWidth = chartWidth / popularityData.length;
+        popularityFrame.setSize(400, 300);
+        popularityFrame.setLocationRelativeTo(null); 
+        popularityFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        // Draw the bars of the chart
-        for (int i = 0; i < popularityData.length; i++) {
-            int barHeight = (int) ((double) popularityData[i] / maxPopularity * chartHeight);
-            int x = 20 + i * barWidth;
-            int y = getHeight() - 20 - barHeight;
-            g.setColor(Color.BLUE);
-            g.fillRect(x, y, barWidth, barHeight);
-            g.setColor(Color.BLACK);
-            g.drawRect(x, y, barWidth, barHeight);
-        }
-                }
-            };
-            popularityFrame.add(chartPanel, BorderLayout.CENTER);
-
-            // Set up frame properties for the popularity chart screen
-            popularityFrame.setSize(400, 300);
-            popularityFrame.setLocationRelativeTo(null); // Center the frame on the screen
-            popularityFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-
-        }
+    }
 
     private void updateTable() {
         tableModel.setRowCount(0);
